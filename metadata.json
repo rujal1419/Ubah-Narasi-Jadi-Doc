@@ -1,0 +1,5 @@
+{
+  "name": "DocuMimic AI",
+  "description": "Transforms narrative text into structured documents (PDF/DOCX) by mimicking the layout of a reference image using Gemini AI.",
+  "requestFramePermissions": []
+}
