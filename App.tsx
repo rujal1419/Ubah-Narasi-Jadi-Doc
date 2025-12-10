@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './components/Button';
 import { FileUpload } from './components/FileUpload';
 import { RichTextEditor } from './components/RichTextEditor';
@@ -15,10 +15,22 @@ const App: React.FC = () => {
   
   // New State for Paper Size
   const [paperSize, setPaperSize] = useState<PaperSize>('A4');
+  
+  // Full Screen State
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   // Analysis States
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+
+  // Close full screen on ESC key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsFullScreen(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   const handleGenerate = async () => {
     // Check text length (stripping tags)
@@ -276,9 +288,21 @@ const App: React.FC = () => {
                       >
                         PDF
                       </Button>
+                      
+                      {/* View Full Screen Button */}
+                      <button 
+                        onClick={() => setIsFullScreen(true)}
+                        className="ml-2 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors border border-blue-100"
+                        title="Lihat Layar Penuh"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                        </svg>
+                      </button>
+
                       <button 
                         onClick={reset}
-                        className="ml-2 text-slate-400 hover:text-slate-600 transition-colors"
+                        className="ml-1 text-slate-400 hover:text-slate-600 transition-colors"
                         title="Reset"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -316,9 +340,41 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-
         </div>
       </main>
+
+      {/* Full Screen Modal */}
+      {isFullScreen && generatedHtml && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 animate-fadeIn">
+          {/* Close Button & Toolbar overlay */}
+          <div className="absolute top-4 right-4 flex gap-2 z-10">
+             <button
+               onClick={() => setIsFullScreen(false)}
+               className="bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition-colors"
+               title="Tutup (Esc)"
+             >
+               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+               </svg>
+             </button>
+          </div>
+
+          {/* Scrollable Container */}
+          <div className="w-full h-full overflow-auto flex justify-center py-8" onClick={() => setIsFullScreen(false)}>
+             {/* Paper */}
+             <div
+                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking paper
+                className="bg-white shadow-2xl origin-top"
+                style={{
+                  ...getPaperDimensions(),
+                  padding: '2.54cm',
+                  marginBottom: '2rem'
+                }}
+                dangerouslySetInnerHTML={{ __html: generatedHtml }}
+             />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

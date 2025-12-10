@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 
 interface RichTextEditorProps {
   value: string;
@@ -8,61 +8,40 @@ interface RichTextEditorProps {
 
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
-  const isTypingRef = useRef(false);
-
-  // Sync logic: Only update innerHTML from prop if it differs significantly and we aren't actively typing
-  // This prevents the cursor from jumping to the start on every keystroke/render
-  useEffect(() => {
+  
+  // We use useLayoutEffect to update the DOM synchronously after render but before paint.
+  // This prevents cursor jumping because we only update innerHTML if strictly necessary
+  // (i.e., when the new value doesn't match the current DOM content).
+  useLayoutEffect(() => {
     if (editorRef.current) {
+      // Only update if content is actually different to avoid resetting cursor/selection
       if (editorRef.current.innerHTML !== value) {
-        // If the element is focused, we need to be careful not to kill the selection
-        // However, if the value changed externally (e.g. Analysis result), we MUST update it.
-        // We use a simple heuristic: if the difference is purely DOM structure normalization, ignore.
-        // But for this use case, if value changes, we usually update.
-        // The key to avoiding jumps is that onChange updates state, which updates prop 'value'.
-        // If editorRef.current.innerHTML === value (which it should be after typing), we do nothing.
-        
-        // Only force update if the mismatch is real (external update)
-         if (document.activeElement !== editorRef.current) {
-             editorRef.current.innerHTML = value;
-         } else {
-             // If we are focused, only update if the lengths are drastically different 
-             // (meaning the content was changed by something other than the user's keystroke, e.g., AI replacement)
-             // or if we really need to sync.
-             // For simple typing, contentEditable handles the view. React just needs the state.
-             const currentHTML = editorRef.current.innerHTML;
-             if (currentHTML !== value) {
-                 // Check if the difference is just a trailing br or normal browser formatting
-                 // If it's a true external change, we apply it and try to save cursor (hard to do perfectly in vanilla React)
-                 // For now, we prioritize NOT updating DOM if focused to keep cursor safe.
-                 // If user clicks "Analysis", focus is lost, so the block above runs.
-             }
-         }
+        editorRef.current.innerHTML = value;
       }
     }
   }, [value]);
 
-  const execCommand = (command: string, value: string | undefined = undefined) => {
-    document.execCommand(command, false, value);
+  const execCommand = (command: string, arg: string | undefined = undefined) => {
+    document.execCommand(command, false, arg);
     if (editorRef.current) {
-      editorRef.current.focus(); // Ensure focus remains
+      editorRef.current.focus();
       onChange(editorRef.current.innerHTML);
     }
   };
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    isTypingRef.current = true;
-    onChange(e.currentTarget.innerHTML);
-    isTypingRef.current = false;
+    const html = e.currentTarget.innerHTML;
+    // We don't filter here; we pass the raw HTML up.
+    // The parent updates the 'value' prop.
+    // The useLayoutEffect above sees that 'value' === 'editorRef.current.innerHTML' and skips update.
+    onChange(html);
   };
 
   const ToolbarButton = ({ command, icon, label }: { command: string, icon: React.ReactNode, label: string }) => (
     <button
       type="button"
-      onClick={(e) => {
-        e.preventDefault(); // Prevent losing focus on editor
-        execCommand(command);
-      }}
+      onMouseDown={(e) => e.preventDefault()} // Critical: Prevents focus loss from editor when clicking button
+      onClick={() => execCommand(command)}
       className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
       title={label}
     >
@@ -73,7 +52,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange,
   return (
     <div className={`flex flex-col border border-slate-300 rounded-xl overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all ${className}`}>
       {/* Toolbar */}
-      <div className="flex items-center gap-1 p-2 border-b border-slate-200 bg-slate-50" onMouseDown={(e) => e.preventDefault()}>
+      <div className="flex items-center gap-1 p-2 border-b border-slate-200 bg-slate-50">
         <ToolbarButton 
           command="bold" 
           label="Bold"
@@ -108,8 +87,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange,
         contentEditable
         onInput={handleInput}
         suppressContentEditableWarning={true}
-        // Initialize with value, but do not update via attribute to avoid cursor reset
-        dangerouslySetInnerHTML={{ __html: value }} 
         className="flex-1 p-4 min-h-[12rem] outline-none text-slate-900 bg-white leading-relaxed text-sm overflow-y-auto"
       />
     </div>
